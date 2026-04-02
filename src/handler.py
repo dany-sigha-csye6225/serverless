@@ -5,7 +5,7 @@ import traceback
 from datetime import datetime, timezone
 
 import boto3
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 # Set up JSON logger
 logger = logging.getLogger()
@@ -15,21 +15,21 @@ formatter = jsonlogger.JsonFormatter()
 logHandler.setFormatter(formatter)
 logger.addHandler(logHandler)
 
-# Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
-ses_client = boto3.client('ses')
-
-# Read environment variables
-EMAIL_VERIFICATION_URL = os.getenv('EMAIL_VERIFICATION_URL')
-DYNAMODB_TABLE_NAME = os.getenv('DYNAMODB_TABLE_NAME')
-SES_FROM_DOMAIN = os.getenv('SES_FROM_DOMAIN')
-
 
 def handler(event, context):
     """
     Lambda handler for email verification email sending.
     Processes SNS events containing email verification requests.
     """
+    # Read environment variables at runtime
+    EMAIL_VERIFICATION_URL = os.getenv('EMAIL_VERIFICATION_URL')
+    DYNAMODB_TABLE_NAME = os.getenv('DYNAMODB_TABLE_NAME')
+    SES_FROM_DOMAIN = os.getenv('SES_FROM_DOMAIN')
+    
+    # Initialize AWS clients (lazy initialization to avoid credential issues at import time)
+    dynamodb = boto3.resource('dynamodb')
+    ses_client = boto3.client('ses')
+    
     try:
         # Log raw event as JSON
         logger.info('Received SNS event', extra={'raw_event': event})
@@ -77,7 +77,7 @@ def handler(event, context):
         if 'Item' in response:
             logger.warning('Duplicate email record found', extra={
                 'email': email,
-                'message': 'Email verification already processed'
+                'detail': 'Email verification already processed'
             })
             return {
                 'statusCode': 409,

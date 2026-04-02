@@ -2,7 +2,7 @@ import json
 import os
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from src.handler import handler
 
@@ -37,20 +37,24 @@ class TestEmailVerificationHandler(unittest.TestCase):
             ]
         }
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_happy_path_new_email(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_happy_path_new_email(self, mock_resource, mock_client):
         """
         Test happy path: new email, DynamoDB returns no record, 
         SES sends, DynamoDB writes successfully.
         """
-        # Mock DynamoDB table
+        # Mock DynamoDB
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
         mock_table.get_item.return_value = {}  # No existing item
         mock_table.put_item.return_value = None  # Success
         
         # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         mock_ses.send_email.return_value = {'MessageId': 'test-message-id'}
         
         # Create event
@@ -82,14 +86,16 @@ class TestEmailVerificationHandler(unittest.TestCase):
         self.assertEqual(item['token'], self.token)
         self.assertFalse(item['verified'])
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_duplicate_email_path(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_duplicate_email_path(self, mock_resource, mock_client):
         """
         Test duplicate path: DynamoDB returns existing record, 
         function returns early, SES is never called.
         """
-        # Mock DynamoDB table with existing item
+        # Mock DynamoDB with existing item
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
         mock_table.get_item.return_value = {
@@ -100,6 +106,10 @@ class TestEmailVerificationHandler(unittest.TestCase):
                 'verified': False
             }
         }
+        
+        # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         
         # Create event
         event = self._create_sns_event(self.email, self.token)
@@ -118,13 +128,19 @@ class TestEmailVerificationHandler(unittest.TestCase):
         # Verify DynamoDB put_item was NOT called
         mock_table.put_item.assert_not_called()
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_missing_email_field(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_missing_email_field(self, mock_resource, mock_client):
         """Test missing fields path: SNS message has no email, returns 400."""
-        # Mock DynamoDB table (for precision in assertions)
+        # Mock DynamoDB (for precision in assertions)
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
+        
+        # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         
         # Create event with missing email
         sns_message = {'token': self.token}
@@ -151,13 +167,19 @@ class TestEmailVerificationHandler(unittest.TestCase):
         mock_table.get_item.assert_not_called()
         mock_ses.send_email.assert_not_called()
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_missing_token_field(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_missing_token_field(self, mock_resource, mock_client):
         """Test missing fields path: SNS message has no token, returns 400."""
-        # Mock DynamoDB table (for precision in assertions)
+        # Mock DynamoDB (for precision in assertions)
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
+        
+        # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         
         # Create event with missing token
         sns_message = {'email': self.email}
@@ -184,19 +206,23 @@ class TestEmailVerificationHandler(unittest.TestCase):
         mock_table.get_item.assert_not_called()
         mock_ses.send_email.assert_not_called()
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_ses_failure_path(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_ses_failure_path(self, mock_resource, mock_client):
         """
         Test SES failure path: SES throws an exception, 
         function catches it and returns 500.
         """
-        # Mock DynamoDB table
+        # Mock DynamoDB
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
         mock_table.get_item.return_value = {}  # No existing item
         
         # Mock SES to raise an exception
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         mock_ses.send_email.side_effect = Exception('SES service error')
         
         # Create event
@@ -216,20 +242,24 @@ class TestEmailVerificationHandler(unittest.TestCase):
         # Verify DynamoDB put_item was NOT called (SES failed before that)
         mock_table.put_item.assert_not_called()
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_dynamodb_write_failure_path(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_dynamodb_write_failure_path(self, mock_resource, mock_client):
         """
         Test DynamoDB write failure path: SES succeeds but DynamoDB write throws,
         function catches and returns 500.
         """
-        # Mock DynamoDB table
+        # Mock DynamoDB
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
         mock_table.get_item.return_value = {}  # No existing item
         mock_table.put_item.side_effect = Exception('DynamoDB write error')
         
         # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         mock_ses.send_email.return_value = {'MessageId': 'test-message-id'}
         
         # Create event
@@ -249,17 +279,21 @@ class TestEmailVerificationHandler(unittest.TestCase):
         # Verify DynamoDB put_item was attempted
         mock_table.put_item.assert_called_once()
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_verification_link_format(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_verification_link_format(self, mock_resource, mock_client):
         """Test that verification link is correctly formatted in SES email."""
-        # Mock DynamoDB table
+        # Mock DynamoDB
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
         mock_table = MagicMock()
         mock_dynamodb.Table.return_value = mock_table
         mock_table.get_item.return_value = {}
         mock_table.put_item.return_value = None
         
         # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
         mock_ses.send_email.return_value = {'MessageId': 'test-message-id'}
         
         # Create event
@@ -276,10 +310,20 @@ class TestEmailVerificationHandler(unittest.TestCase):
         expected_link = f"{self.verification_url}/validateEmail?email={self.email}&token={self.token}"
         self.assertIn(expected_link, message_body)
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_empty_email_string(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_empty_email_string(self, mock_resource, mock_client):
         """Test that empty email string is treated as missing field."""
+        # Mock DynamoDB
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
+        mock_table = MagicMock()
+        mock_dynamodb.Table.return_value = mock_table
+        
+        # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
+        
         # Create event with empty email
         sns_message = {'email': '', 'token': self.token}
         event = {
@@ -300,10 +344,20 @@ class TestEmailVerificationHandler(unittest.TestCase):
         body = json.loads(response['body'])
         self.assertIn('error', body)
 
-    @patch('src.handler.ses_client')
-    @patch('src.handler.dynamodb')
-    def test_empty_token_string(self, mock_dynamodb, mock_ses):
+    @patch('src.handler.boto3.client')
+    @patch('src.handler.boto3.resource')
+    def test_empty_token_string(self, mock_resource, mock_client):
         """Test that empty token string is treated as missing field."""
+        # Mock DynamoDB
+        mock_dynamodb = MagicMock()
+        mock_resource.return_value = mock_dynamodb
+        mock_table = MagicMock()
+        mock_dynamodb.Table.return_value = mock_table
+        
+        # Mock SES
+        mock_ses = MagicMock()
+        mock_client.return_value = mock_ses
+        
         # Create event with empty token
         sns_message = {'email': self.email, 'token': ''}
         event = {
