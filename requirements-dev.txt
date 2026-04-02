@@ -1,0 +1,4 @@
+pytest
+moto
+flake8
+botocore[crt]
