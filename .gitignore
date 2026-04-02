@@ -13,6 +13,9 @@ build/
 .env
 .env.local
 
+#Virtual environment
+venv/
+
 # .tfstate files
 *.tfstate
 *.tfstate.*
