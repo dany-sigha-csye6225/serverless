@@ -1,0 +1,74 @@
+name: Deploy Email Verification Lambda
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get Git SHA (short)
+        id: git_sha
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t csye6225-lambda:latest .
+          docker tag csye6225-lambda:latest csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
+
+      - name: Configure AWS credentials for dev account
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_DEV_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_DEV_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to dev ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ secrets.DEV_ECR_REGISTRY }}
+
+      - name: Push to dev ECR
+        run: |
+          docker tag csye6225-lambda:latest ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:latest
+          docker tag csye6225-lambda:${{ steps.git_sha.outputs.short_sha }} ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
+          docker push ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:latest
+          docker push ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
+
+      - name: Configure AWS credentials for demo account
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_DEMO_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_DEMO_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to demo ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ secrets.DEMO_ECR_REGISTRY }}
+
+      - name: Push to demo ECR
+        run: |
+          docker tag csye6225-lambda:latest ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:latest
+          docker tag csye6225-lambda:${{ steps.git_sha.outputs.short_sha }} ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
+          docker push ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:latest
+          docker push ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
+
+      - name: Log deployment status
+        run: |
+          echo "Deployment complete"
+          echo "Dev ECR: ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:latest"
+          echo "Demo ECR: ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:latest"
+          echo "Git SHA: ${{ steps.git_sha.outputs.short_sha }}"
