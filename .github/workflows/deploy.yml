@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -48,6 +51,7 @@ jobs:
           docker tag csye6225-lambda:latest csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
 
       - name: Configure AWS credentials for dev account
+        if: github.event_name == 'push'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_DEV_ACCESS_KEY_ID }}
@@ -55,11 +59,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to dev ECR
+        if: github.event_name == 'push'
         run: |
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
             docker login --username AWS --password-stdin ${{ secrets.DEV_ECR_REGISTRY }}
 
       - name: Push to dev ECR
+        if: github.event_name == 'push'
         run: |
           docker tag csye6225-lambda:latest ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:latest
           docker tag csye6225-lambda:${{ steps.git_sha.outputs.short_sha }} ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
@@ -67,6 +73,7 @@ jobs:
           docker push ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
 
       - name: Configure AWS credentials for demo account
+        if: github.event_name == 'push'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_DEMO_ACCESS_KEY_ID }}
@@ -74,11 +81,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to demo ECR
+        if: github.event_name == 'push'
         run: |
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
             docker login --username AWS --password-stdin ${{ secrets.DEMO_ECR_REGISTRY }}
 
       - name: Push to demo ECR
+        if: github.event_name == 'push'
         run: |
           docker tag csye6225-lambda:latest ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:latest
           docker tag csye6225-lambda:${{ steps.git_sha.outputs.short_sha }} ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
@@ -86,6 +95,7 @@ jobs:
           docker push ${{ secrets.DEMO_ECR_REGISTRY }}/csye6225-lambda:${{ steps.git_sha.outputs.short_sha }}
 
       - name: Log deployment status
+        if: github.event_name == 'push'
         run: |
           echo "Deployment complete"
           echo "Dev ECR: ${{ secrets.DEV_ECR_REGISTRY }}/csye6225-lambda:latest"

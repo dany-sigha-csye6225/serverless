@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import boto3
 from pythonjsonlogger import json as jsonlogger
+from urllib.parse import quote
 
 # Set up JSON logger
 logger = logging.getLogger()
@@ -59,7 +60,9 @@ def handler(event, context):
             }
 
         # Construct the verification link
-        verification_link = f"{EMAIL_VERIFICATION_URL}/validateEmail?email={email}&token={token}"
+        email_encoded = quote(email, safe='')
+        verification_link = f"{EMAIL_VERIFICATION_URL}/v1/validateEmail?email={email_encoded}&token={token}"
+
         logger.info('Constructed verification link', extra={
             'email': email,
             'verification_link': verification_link
