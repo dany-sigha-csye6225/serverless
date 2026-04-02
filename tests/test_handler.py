@@ -3,6 +3,7 @@ import os
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+from urllib.parse import quote
 
 from src.handler import handler
 
@@ -307,7 +308,7 @@ class TestEmailVerificationHandler(unittest.TestCase):
         message_body = call_args[1]['Message']['Body']['Html']['Data']
         
         # Verify the link is correctly constructed
-        expected_link = f"{self.verification_url}/validateEmail?email={self.email}&token={self.token}"
+        expected_link = f"{self.verification_url}/v1/validateEmail?email={quote(self.email, safe='')}&token={self.token}"
         self.assertIn(expected_link, message_body)
 
     @patch('src.handler.boto3.client')
