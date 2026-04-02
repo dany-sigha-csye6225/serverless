@@ -28,6 +28,26 @@ pip install -r requirements.txt
 docker build -t email-verification-lambda:latest .
 ```
 
+### 2. Run Code Linting and Formatting
+
+Before committing or running tests, ensure code passes flake8 linting checks:
+
+```bash
+# Auto-format code to PEP 8 standards
+autopep8 --in-place --max-line-length=127 src/handler.py
+
+# Run flake8 lint check
+flake8 src/handler.py --max-line-length=127
+```
+
+These checks are required by the GitHub Actions workflow. Running them locally prevents CI failures.
+
+### 3. Build Docker Image Locally
+
+```bash
+docker build -t email-verification-lambda:latest .
+```
+
 Verify the image was created:
 
 ```bash
@@ -62,7 +82,25 @@ docker run --rm \
   handler.handler
 ```
 
-## ECR Setup and Deployment
+## Testing
+
+### Run Unit Tests
+
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+
+# Run pytest
+pytest tests/ -v
+```
+
+All tests must pass before code can be merged. Tests validate:
+- Happy path: email sends and DynamoDB record created
+- Duplicate prevention: existing emails return 409
+- Missing fields: invalid input returns 400
+- Error handling: SES and DynamoDB failures return 500
+
+
 
 ### 1. Push to Dev Account ECR
 
