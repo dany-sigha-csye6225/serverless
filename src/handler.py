@@ -104,6 +104,7 @@ def handler(event, context):
                             'Data': f'''
                             <html>
                                 <body>
+                                    <p>UPDATED MESSAGE FOR TEST PURPOSES!!!</p>
                                     <p>Please verify your email by clicking the link below:</p>
                                     <a href="{verification_link}">Verify Email</a>
                                 </body>
