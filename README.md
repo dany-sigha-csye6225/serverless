@@ -21,7 +21,7 @@ AWS Lambda function for handling email verification requests. Processes SNS even
 ## Related Repositories
 
 - [webapp](https://github.com/dany-sigha-csye6225/webapp) - Main web application
-- [tf-infra](https://github.com/dany-sigha-csye6225/tf-infra) - Terraform infrastructure as code for AWS adn GCP deployment
+- [tf-infra](https://github.com/dany-sigha-csye6225/tf-infra) - Terraform infrastructure as code for AWS and GCP deployment
 
 ## Getting Started
 
